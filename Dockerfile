@@ -21,6 +21,10 @@ COPY . .
 # No secrets are needed at build time; do NOT pass API keys as build args.
 RUN npm run build \
  && npm prune --omit=dev --no-audit --no-fund \
+ # next.config.ts needs the `typescript` package to parse at every `next start`, not just
+ # at build time - pruning it away makes Next.js try to auto-install it at container
+ # startup, which then fails under readOnlyRootFilesystem and crash-loops the pod.
+ && npm install --no-save --no-audit --no-fund typescript \
  && rm -rf .next/cache node_modules/@next/swc-linux-*-musl
 
 # ---------- runtime ----------
