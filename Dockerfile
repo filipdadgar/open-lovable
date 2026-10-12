@@ -29,10 +29,17 @@ COPY . .
 # back the other ~230 pruned devDependencies too. Installing it with no package.json in
 # scope (via --prefix into a scratch dir) sidesteps the classification entirely; typescript
 # has no runtime dependencies of its own, so copying just that one directory in is enough.
+# Must pin to the exact version package-lock.json locks (read dynamically, not hardcoded,
+# so this stays correct as sync-upstream pulls in future dependency bumps): an unpinned
+# install grabs whatever is currently latest on npm, which was typescript@7.0.2 against a
+# locked 5.8.3 - that major-version jump broke Next.js's internal use of the TS compiler
+# API for loading next.config.ts (TypeError: Cannot read properties of undefined (reading
+# 'fileExists')).
 RUN npm run build \
  && npm prune --omit=dev --no-audit --no-fund \
  && mkdir -p /tmp/tsdep \
- && npm install --prefix /tmp/tsdep --no-audit --no-fund --no-save typescript \
+ && TS_VERSION="$(node -p "require('./package-lock.json').packages['node_modules/typescript'].version")" \
+ && npm install --prefix /tmp/tsdep --no-audit --no-fund --no-save "typescript@${TS_VERSION}" \
  && cp -r /tmp/tsdep/node_modules/typescript ./node_modules/typescript \
  && rm -rf /tmp/tsdep .next/cache node_modules/@next/swc-linux-*-musl
 
