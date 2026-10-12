@@ -22,10 +22,19 @@ COPY . .
 # next.config.ts needs the `typescript` package to parse at every `next start`, not just
 # at build time - pruning it away makes Next.js try to auto-install it at container
 # startup, which then fails under readOnlyRootFilesystem and crash-loops the pod.
+# `npm install typescript` alone is NOT enough to put it back: NODE_ENV=production makes
+# npm default to omit=dev, and that omit still applies to a package explicitly named on
+# the command line if package.json already classifies it as a devDependency - it silently
+# no-ops ("up to date", exit 0) instead of installing. `--include=dev` does work but drags
+# back the other ~230 pruned devDependencies too. Installing it with no package.json in
+# scope (via --prefix into a scratch dir) sidesteps the classification entirely; typescript
+# has no runtime dependencies of its own, so copying just that one directory in is enough.
 RUN npm run build \
  && npm prune --omit=dev --no-audit --no-fund \
- && npm install --no-save --no-audit --no-fund typescript \
- && rm -rf .next/cache node_modules/@next/swc-linux-*-musl
+ && mkdir -p /tmp/tsdep \
+ && npm install --prefix /tmp/tsdep --no-audit --no-fund --no-save typescript \
+ && cp -r /tmp/tsdep/node_modules/typescript ./node_modules/typescript \
+ && rm -rf /tmp/tsdep .next/cache node_modules/@next/swc-linux-*-musl
 
 # ---------- runtime ----------
 FROM ${NODE_IMAGE} AS runtime
