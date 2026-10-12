@@ -51,29 +51,38 @@ export const appConfig = {
   // AI Model Configuration
   ai: {
     // Default AI model
-    defaultModel: 'google/gemini-3-pro-preview',
-    
+    // NOTE: changed from upstream's 'google/gemini-3-pro-preview' - this deployment only
+    // configures GROQ_API_KEY, so the default must be the one model that actually works.
+    defaultModel: 'openai/gpt-oss-120b',
+
     // Available models
+    // NOTE: 'moonshotai/kimi-k2-instruct-0905' replaced with 'openai/gpt-oss-120b' -
+    // Groq discontinued the Kimi K2 model entirely (confirmed via their public model
+    // list after the app started 404ing with "model_not_found" on generation requests).
     availableModels: [
       'openai/gpt-5',
-      'moonshotai/kimi-k2-instruct-0905',
+      'openai/gpt-oss-120b',
       'anthropic/claude-sonnet-4-20250514',
       'google/gemini-3-pro-preview'
     ],
-    
+
     // Model display names
     modelDisplayNames: {
       'openai/gpt-5': 'GPT-5',
-      'moonshotai/kimi-k2-instruct-0905': 'Kimi K2 (Groq)',
+      'openai/gpt-oss-120b': 'GPT-OSS 120B (Groq)',
       'anthropic/claude-sonnet-4-20250514': 'Sonnet 4',
       'google/gemini-3-pro-preview': 'Gemini 3 Pro (Preview)'
     } as Record<string, string>,
     
     // Model API configuration
+    // 'openai/gpt-oss-120b' needs this explicit override despite its "openai/" prefix -
+    // without it, getProviderForModel()'s prefix-based fallback would route it to the
+    // real OpenAI provider (no OPENAI_API_KEY configured here) instead of Groq, where
+    // this exact model slug actually lives.
     modelApiConfig: {
-      'moonshotai/kimi-k2-instruct-0905': {
+      'openai/gpt-oss-120b': {
         provider: 'groq',
-        model: 'moonshotai/kimi-k2-instruct-0905'
+        model: 'openai/gpt-oss-120b'
       }
     },
     
