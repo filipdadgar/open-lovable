@@ -44,6 +44,14 @@ const openai = createOpenAI({
   baseURL: isUsingAIGateway ? aiGatewayBaseURL : process.env.OPENAI_BASE_URL,
 });
 
+// OpenRouter: OpenAI-compatible endpoint, used for its free-tier models. Its free tier is
+// request-count limited (20/min, 50-1000/day depending on lifetime credit purchases), not
+// token-volume limited like Groq's account-wide 8K TPM cap - the reason it's here at all.
+const openrouter = createOpenAI({
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: 'https://openrouter.ai/api/v1',
+});
+
 // Helper function to analyze user preferences from conversation history
 function analyzeUserPreferences(messages: ConversationMessage[]): {
   commonPatterns: string[];
@@ -90,7 +98,7 @@ declare global {
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, model = 'openai/gpt-oss-20b', context, isEdit = false } = await request.json();
+    const { prompt, model = 'openrouter/cohere/north-mini-code:free', context, isEdit = false } = await request.json();
     
     console.log('[generate-ai-code-stream] Received request:');
     console.log('[generate-ai-code-stream] - prompt:', prompt);
@@ -1223,15 +1231,21 @@ MORPH FAST APPLY MODE (EDIT-ONLY):
         // real OpenAI client and failing with "OpenAI API key is missing".
         const isOpenAI = model.startsWith('openai/') && !model.includes('gpt-oss');
         const isKimiGroq = model === 'moonshotai/kimi-k2-instruct-0905';
-        const modelProvider = isAnthropic ? anthropic : 
-                              (isOpenAI ? openai : 
-                              (isGoogle ? googleGenerativeAI : 
-                              (isKimiGroq ? groq : groq)));
-        
+        const isOpenRouter = model.startsWith('openrouter/');
+        const modelProvider = isAnthropic ? anthropic :
+                              (isOpenRouter ? openrouter :
+                              (isOpenAI ? openai :
+                              (isGoogle ? googleGenerativeAI :
+                              (isKimiGroq ? groq : groq))));
+
         // Fix model name transformation for different providers
         let actualModel: string;
         if (isAnthropic) {
           actualModel = model.replace('anthropic/', '');
+        } else if (isOpenRouter) {
+          // Strip only our own routing prefix - the remainder (e.g. "cohere/north-mini-code:free")
+          // is OpenRouter's own model slug and must be passed through unchanged.
+          actualModel = model.replace('openrouter/', '');
         } else if (isOpenAI) {
           actualModel = model.replace('openai/', '');
         } else if (isKimiGroq) {
@@ -1244,7 +1258,7 @@ MORPH FAST APPLY MODE (EDIT-ONLY):
           actualModel = model;
         }
 
-        console.log(`[generate-ai-code-stream] Using provider: ${isAnthropic ? 'Anthropic' : isGoogle ? 'Google' : isOpenAI ? 'OpenAI' : 'Groq'}, model: ${actualModel}`);
+        console.log(`[generate-ai-code-stream] Using provider: ${isAnthropic ? 'Anthropic' : isOpenRouter ? 'OpenRouter' : isGoogle ? 'Google' : isOpenAI ? 'OpenAI' : 'Groq'}, model: ${actualModel}`);
         console.log(`[generate-ai-code-stream] AI Gateway enabled: ${isUsingAIGateway}`);
         console.log(`[generate-ai-code-stream] Model string: ${model}`);
 

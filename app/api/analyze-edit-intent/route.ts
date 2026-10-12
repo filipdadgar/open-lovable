@@ -31,6 +31,15 @@ const googleGenerativeAI = createGoogleGenerativeAI({
   baseURL: isUsingAIGateway ? aiGatewayBaseURL : undefined,
 });
 
+// OpenRouter: OpenAI-compatible endpoint, used for its free-tier models (see
+// generate-ai-code-stream/route.ts for why - Groq's free tier is token-volume limited
+// to 8K TPM account-wide, too small for this app's typical request sizes; OpenRouter's
+// free tier is request-count limited instead, which fits this workload).
+const openrouter = createOpenAI({
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: 'https://openrouter.ai/api/v1',
+});
+
 // Schema for the AI's search plan - not file selection!
 const searchPlanSchema = z.object({
   editType: z.enum([
@@ -107,6 +116,9 @@ export async function POST(request: NextRequest) {
     let aiModel;
     if (model.startsWith('anthropic/')) {
       aiModel = anthropic(model.replace('anthropic/', ''));
+    } else if (model.startsWith('openrouter/')) {
+      // Strip only our own routing prefix - the remainder is OpenRouter's own model slug.
+      aiModel = openrouter(model.replace('openrouter/', ''));
     } else if (model.startsWith('openai/')) {
       if (model.includes('gpt-oss')) {
         aiModel = groq(model);

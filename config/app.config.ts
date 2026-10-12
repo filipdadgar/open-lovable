@@ -51,17 +51,22 @@ export const appConfig = {
   // AI Model Configuration
   ai: {
     // Default AI model
-    // NOTE: changed from upstream's 'google/gemini-3-pro-preview' - this deployment only
-    // configures GROQ_API_KEY, so the default must be the one model that actually works.
-    defaultModel: 'openai/gpt-oss-120b',
+    // NOTE: changed from upstream's 'google/gemini-3-pro-preview'. First tried Groq
+    // (openai/gpt-oss-120b) since this deployment only configures GROQ_API_KEY, but
+    // Groq's free tier is hard-capped at 8,000 tokens/minute ACCOUNT-WIDE - confirmed
+    // identical across every text model reachable on this account (gpt-oss-120b,
+    // gpt-oss-20b, qwen3.8-27b all returned the same 8000 TPM limit header; llama-3.1-8b
+    // -instant/llama-3.3-70b-versatile aren't even reachable on this account, 404). This
+    // app's generation requests routinely need ~35K+ tokens (full scraped page content),
+    // so no Groq model works regardless of size. Switched to OpenRouter instead: its free
+    // tier is request-count limited (20/min, 50-1000/day), not token-volume limited, so a
+    // single large request is fine. Picked for explicit code specialization + credible lab.
+    defaultModel: 'openrouter/cohere/north-mini-code:free',
 
     // Available models
-    // NOTE: 'moonshotai/kimi-k2-instruct-0905' replaced with 'openai/gpt-oss-120b' -
-    // Groq discontinued the Kimi K2 model entirely (confirmed via their public model
-    // list after the app started 404ing with "model_not_found" on generation requests).
     availableModels: [
       'openai/gpt-5',
-      'openai/gpt-oss-120b',
+      'openrouter/cohere/north-mini-code:free',
       'anthropic/claude-sonnet-4-20250514',
       'google/gemini-3-pro-preview'
     ],
@@ -69,22 +74,18 @@ export const appConfig = {
     // Model display names
     modelDisplayNames: {
       'openai/gpt-5': 'GPT-5',
-      'openai/gpt-oss-120b': 'GPT-OSS 120B (Groq)',
+      'openrouter/cohere/north-mini-code:free': 'Cohere North Mini Code (OpenRouter, free)',
       'anthropic/claude-sonnet-4-20250514': 'Sonnet 4',
       'google/gemini-3-pro-preview': 'Gemini 3 Pro (Preview)'
     } as Record<string, string>,
-    
+
     // Model API configuration
-    // 'openai/gpt-oss-120b' needs this explicit override despite its "openai/" prefix -
-    // without it, getProviderForModel()'s prefix-based fallback would route it to the
-    // real OpenAI provider (no OPENAI_API_KEY configured here) instead of Groq, where
-    // this exact model slug actually lives.
-    modelApiConfig: {
-      'openai/gpt-oss-120b': {
-        provider: 'groq',
-        model: 'openai/gpt-oss-120b'
-      }
-    },
+    // Unused by this deployment: lib/ai/provider-manager.ts (the only consumer of this
+    // field) has no importers anywhere in the app - the actual routes
+    // (generate-ai-code-stream, analyze-edit-intent) each do their own prefix-based
+    // provider dispatch independently. Left empty rather than removed, in case a future
+    // upstream change starts using it.
+    modelApiConfig: {},
     
     // Temperature settings for non-reasoning models
     defaultTemperature: 0.7,
