@@ -1215,7 +1215,13 @@ MORPH FAST APPLY MODE (EDIT-ONLY):
         // Determine which provider to use based on model
         const isAnthropic = model.startsWith('anthropic/');
         const isGoogle = model.startsWith('google/');
-        const isOpenAI = model.startsWith('openai/');
+        // Groq hosts some models under an "openai/" name (e.g. gpt-oss-20b/120b) that are
+        // NOT the real OpenAI API - analyze-edit-intent/route.ts already excludes these
+        // correctly (`if (model.includes('gpt-oss')) aiModel = groq(model)`); this file
+        // was missing the same exclusion, so an "openai/gpt-oss-*" model (including this
+        // file's own hardcoded default at the top of this handler) was being sent to the
+        // real OpenAI client and failing with "OpenAI API key is missing".
+        const isOpenAI = model.startsWith('openai/') && !model.includes('gpt-oss');
         const isKimiGroq = model === 'moonshotai/kimi-k2-instruct-0905';
         const modelProvider = isAnthropic ? anthropic : 
                               (isOpenAI ? openai : 
